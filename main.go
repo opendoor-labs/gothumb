@@ -21,19 +21,22 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/nfnt/resize"
+	"github.com/rlmcpherson/s3gof3r"
 )
 
 var (
-	maxAge      int
-	securityKey []byte
+	maxAge           int
+	securityKey      []byte
+	resultBucketName string
+	useRRS           bool
+
+	httpClient   *http.Client
+	resultBucket *s3gof3r.Bucket
 )
 
 func main() {
-	securityKeyStr := os.Getenv("SECURITY_KEY")
-	if securityKeyStr == "" {
-		log.Fatal("missing SECURITY_KEY")
-	}
-	securityKey = []byte(securityKeyStr)
+	securityKey = []byte(mustGetenv("SECURITY_KEY"))
+	resultBucketName = mustGetenv("RESULT_STORAGE_BUCKET")
 
 	if maxAgeStr := os.Getenv("MAX_AGE"); maxAgeStr != "" {
 		var err error
@@ -41,6 +44,17 @@ func main() {
 			log.Fatal("invalid MAX_AGE setting")
 		}
 	}
+	if rrs := os.Getenv("useRRS"); rrs == "true" || rrs == "1" {
+		useRRS = true
+	}
+
+	keys, err := s3gof3r.EnvKeys()
+	if err != nil {
+		log.Fatal(err)
+	}
+	resultBucket = s3gof3r.New(s3gof3r.DefaultDomain, keys).Bucket(resultBucketName)
+	resultBucket.Md5Check = true
+	httpClient = resultBucket.Client
 
 	router := httprouter.New()
 	router.HEAD("/:signature/:size/*source", handleResize)
@@ -69,7 +83,29 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	resp, err := http.Get(sourceURL.String())
+	// TODO(bgentry): normalize path. Support for custom root path? ala RESULT_STORAGE_AWS_STORAGE_ROOT_PATH
+
+	// try to get stored result
+	r, h, err := resultBucket.GetReader(req.URL.Path, nil)
+	if err != nil {
+		generateThumbnail(w, req, sourceURL.String(), width, height)
+		return
+	}
+
+	// return stored result
+	w.Header().Set("Content-Type", "image/jpeg") // TODO: use stored content type
+	w.Header().Set("Content-Length", h.Get("Content-Length"))
+	w.Header().Set("ETag", h.Get("Etag"))
+	setCacheHeaders(w)
+	if _, err = io.Copy(w, r); err != nil {
+		fmt.Printf("copying from stored result: %s", err)
+		http.Error(w, err.Error(), 500)
+		return
+	}
+}
+
+func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL string, width, height uint) {
+	resp, err := httpClient.Get(sourceURL)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -103,8 +139,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	w.Header().Set("ETag", `"`+computeHexMD5(buf.Bytes())+`"`)
-	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d,public", maxAge))
-	w.Header().Set("Expires", time.Now().UTC().Add(time.Duration(maxAge)*time.Second).Format(http.TimeFormat))
+	setCacheHeaders(w)
 	if req.Method == "HEAD" {
 		return
 	} else {
@@ -128,6 +163,14 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
+func mustGetenv(name string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		log.Fatalf("missing %s env", name)
+	}
+	return value
+}
+
 func parseWidthAndHeight(str string) (width, height uint, err error) {
 	sizeParts := strings.Split(str, "x")
 	if len(sizeParts) != 2 {
@@ -145,6 +188,11 @@ func parseWidthAndHeight(str string) (width, height uint, err error) {
 		return
 	}
 	return uint(width64), uint(height64), nil
+}
+
+func setCacheHeaders(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d,public", maxAge))
+	w.Header().Set("Expires", time.Now().UTC().Add(time.Duration(maxAge)*time.Second).Format(http.TimeFormat))
 }
 
 func validateSignature(sig, pathPart string) error {
