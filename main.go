@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/subtle"
@@ -80,9 +81,17 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 
 	imgResized := resize.Resize(width, height, img, resize.Bicubic)
-	w.Header().Set("Content-Type", "image/jpeg")
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, imgResized, nil); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
 	// TODO(bgentry) set other headers
-	jpeg.Encode(w, imgResized, nil)
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+	if _, err = buf.WriteTo(w); err != nil {
+		log.Printf("writing buffer to response: %s", err)
+	}
 }
 
 func copyHeader(dst, src http.Header) {
