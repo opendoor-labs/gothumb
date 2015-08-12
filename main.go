@@ -31,6 +31,7 @@ func main() {
 	securityKey = []byte(securityKeyStr)
 
 	router := httprouter.New()
+	router.HEAD("/:signature/:size/*source", handleResize)
 	router.GET("/:signature/:size/*source", handleResize)
 	log.Fatal(http.ListenAndServe(":8888", router))
 }
@@ -61,6 +62,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		http.Error(w, err.Error(), 500)
 		return
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		copyHeader(w.Header(), resp.Header)
@@ -89,8 +91,11 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	// TODO(bgentry) set other headers
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
-	if _, err = buf.WriteTo(w); err != nil {
-		log.Printf("writing buffer to response: %s", err)
+	if req.Method == "HEAD" {
+	} else {
+		if _, err = buf.WriteTo(w); err != nil {
+			log.Printf("writing buffer to response: %s", err)
+		}
 	}
 }
 
