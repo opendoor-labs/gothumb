@@ -17,12 +17,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/nfnt/resize"
 )
 
-var securityKey []byte
+var (
+	maxAge      int
+	securityKey []byte
+)
 
 func main() {
 	securityKeyStr := os.Getenv("SECURITY_KEY")
@@ -30,6 +34,13 @@ func main() {
 		log.Fatal("missing SECURITY_KEY")
 	}
 	securityKey = []byte(securityKeyStr)
+
+	if maxAgeStr := os.Getenv("MAX_AGE"); maxAgeStr != "" {
+		var err error
+		if maxAge, err = strconv.Atoi(maxAgeStr); err != nil {
+			log.Fatal("invalid MAX_AGE setting")
+		}
+	}
 
 	router := httprouter.New()
 	router.HEAD("/:signature/:size/*source", handleResize)
@@ -89,10 +100,11 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	// TODO(bgentry) set other headers
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
 	w.Header().Set("ETag", `"`+computeHexMD5(buf.Bytes())+`"`)
+	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d,public", maxAge))
+	w.Header().Set("Expires", time.Now().UTC().Add(time.Duration(maxAge)*time.Second).Format(http.TimeFormat))
 	if req.Method == "HEAD" {
 		return
 	} else {
