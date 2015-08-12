@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -8,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -15,9 +20,17 @@ import (
 	"github.com/nfnt/resize"
 )
 
+var securityKey []byte
+
 func main() {
+	securityKeyStr := os.Getenv("SECURITY_KEY")
+	if securityKeyStr == "" {
+		log.Fatal("missing SECURITY_KEY")
+	}
+	securityKey = []byte(securityKeyStr)
+
 	router := httprouter.New()
-	router.GET("/:size/*source", handleResize)
+	router.GET("/:signature/:size/*source", handleResize)
 	log.Fatal(http.ListenAndServe(":8888", router))
 }
 
@@ -26,6 +39,13 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	sourceURL, err := url.Parse(strings.TrimPrefix(params.ByName("source"), "/"))
 	if err != nil || !(sourceURL.Scheme == "http" || sourceURL.Scheme == "https") {
 		http.Error(w, "invalid source URL", 400)
+		return
+	}
+
+	sig := params.ByName("signature")
+	pathToVerify := strings.TrimPrefix(req.URL.Path, "/"+sig+"/")
+	if err := validateSignature(sig, pathToVerify); err != nil {
+		http.Error(w, "invalid signature", 401)
 		return
 	}
 
@@ -90,4 +110,17 @@ func parseWidthAndHeight(str string) (width, height uint, err error) {
 		return
 	}
 	return uint(width64), uint(height64), nil
+}
+
+func validateSignature(sig, pathPart string) error {
+	h := hmac.New(sha1.New, securityKey)
+	if _, err := h.Write([]byte(pathPart)); err != nil {
+		return err
+	}
+	actualSig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	// constant-time string comparison
+	if subtle.ConstantTimeCompare([]byte(sig), []byte(actualSig)) != 1 {
+		return fmt.Errorf("signature mismatch")
+	}
+	return nil
 }
