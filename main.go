@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/subtle"
 	"encoding/base64"
@@ -91,12 +92,20 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	// TODO(bgentry) set other headers
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+	w.Header().Set("ETag", `"`+computeHexMD5(buf.Bytes())+`"`)
 	if req.Method == "HEAD" {
+		return
 	} else {
 		if _, err = buf.WriteTo(w); err != nil {
 			log.Printf("writing buffer to response: %s", err)
 		}
 	}
+}
+
+func computeHexMD5(data []byte) string {
+	h := md5.New()
+	h.Write(data)
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 func copyHeader(dst, src http.Header) {
