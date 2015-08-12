@@ -29,17 +29,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	sizeParts := strings.Split(params.ByName("size"), "x")
-	if len(sizeParts) != 2 {
-		http.Error(w, "invalid width requested", 400)
-		return
-	}
-	width, err := strconv.ParseUint(sizeParts[0], 10, 64)
-	if err != nil {
-		http.Error(w, "invalid width requested", 400)
-		return
-	}
-	height, err := strconv.ParseUint(sizeParts[1], 10, 64)
+	width, height, err := parseWidthAndHeight(params.ByName("size"))
 	if err != nil {
 		http.Error(w, "invalid height requested", 400)
 		return
@@ -69,7 +59,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	imgResized := resize.Resize(uint(width), uint(height), img, resize.Bicubic)
+	imgResized := resize.Resize(width, height, img, resize.Bicubic)
 	w.Header().Set("Content-Type", "image/jpeg")
 	// TODO(bgentry) set other headers
 	jpeg.Encode(w, imgResized, nil)
@@ -81,4 +71,23 @@ func copyHeader(dst, src http.Header) {
 			dst.Add(k, v)
 		}
 	}
+}
+
+func parseWidthAndHeight(str string) (width, height uint, err error) {
+	sizeParts := strings.Split(str, "x")
+	if len(sizeParts) != 2 {
+		err = fmt.Errorf("invalid size requested")
+		return
+	}
+	width64, err := strconv.ParseUint(sizeParts[0], 10, 64)
+	if err != nil {
+		err = fmt.Errorf("invalid width requested")
+		return
+	}
+	height64, err := strconv.ParseUint(sizeParts[1], 10, 64)
+	if err != nil {
+		err = fmt.Errorf("invalid height requested")
+		return
+	}
+	return uint(width64), uint(height64), nil
 }
