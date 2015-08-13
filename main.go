@@ -125,6 +125,28 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 }
 
+type result struct {
+	Data          []byte
+	ContentType   string
+	ContentLength int
+	ETag          string
+	Path          string
+}
+
+func computeHexMD5(data []byte) string {
+	h := md5.New()
+	h.Write(data)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func copyHeader(dst, src http.Header) {
+	for k, vv := range src {
+		for _, v := range vv {
+			dst.Add(k, v)
+		}
+	}
+}
+
 func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL string, width, height uint) {
 	log.Printf("generating %s", rpath)
 	resp, err := httpClient.Get(sourceURL)
@@ -210,10 +232,43 @@ func getStoredResult(method, path string) (io.ReadCloser, http.Header, error) {
 	return res.Body, res.Header, err
 }
 
+func mustGetenv(name string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		log.Fatalf("missing %s env", name)
+	}
+	return value
+}
+
 func normalizePath(p string) string {
 	// TODO(bgentry): Support for custom root path? ala RESULT_STORAGE_AWS_STORAGE_ROOT_PATH
 	return path.Clean(p)
 }
+
+func parseWidthAndHeight(str string) (width, height uint, err error) {
+	sizeParts := strings.Split(str, "x")
+	if len(sizeParts) != 2 {
+		err = fmt.Errorf("invalid size requested")
+		return
+	}
+	width64, err := strconv.ParseUint(sizeParts[0], 10, 64)
+	if err != nil {
+		err = fmt.Errorf("invalid width requested")
+		return
+	}
+	height64, err := strconv.ParseUint(sizeParts[1], 10, 64)
+	if err != nil {
+		err = fmt.Errorf("invalid height requested")
+		return
+	}
+	return uint(width64), uint(height64), nil
+}
+
+func setCacheHeaders(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d,public", maxAge))
+	w.Header().Set("Expires", time.Now().UTC().Add(time.Duration(maxAge)*time.Second).Format(http.TimeFormat))
+}
+
 func setResultHeaders(w http.ResponseWriter, result *result) {
 	w.Header().Set("Content-Type", result.ContentType)
 	w.Header().Set("Content-Length", strconv.Itoa(result.ContentLength))
@@ -240,60 +295,6 @@ func storeResult(res *result) {
 	if err = w.Close(); err != nil {
 		log.Printf("storing result for %s: %s", res.Path, err)
 	}
-}
-
-type result struct {
-	Data          []byte
-	ContentType   string
-	ContentLength int
-	ETag          string
-	Path          string
-}
-
-func computeHexMD5(data []byte) string {
-	h := md5.New()
-	h.Write(data)
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
-	}
-}
-
-func mustGetenv(name string) string {
-	value := os.Getenv(name)
-	if value == "" {
-		log.Fatalf("missing %s env", name)
-	}
-	return value
-}
-
-func parseWidthAndHeight(str string) (width, height uint, err error) {
-	sizeParts := strings.Split(str, "x")
-	if len(sizeParts) != 2 {
-		err = fmt.Errorf("invalid size requested")
-		return
-	}
-	width64, err := strconv.ParseUint(sizeParts[0], 10, 64)
-	if err != nil {
-		err = fmt.Errorf("invalid width requested")
-		return
-	}
-	height64, err := strconv.ParseUint(sizeParts[1], 10, 64)
-	if err != nil {
-		err = fmt.Errorf("invalid height requested")
-		return
-	}
-	return uint(width64), uint(height64), nil
-}
-
-func setCacheHeaders(w http.ResponseWriter) {
-	w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d,public", maxAge))
-	w.Header().Set("Expires", time.Now().UTC().Add(time.Duration(maxAge)*time.Second).Format(http.TimeFormat))
 }
 
 func validateSignature(sig, pathPart string) error {
