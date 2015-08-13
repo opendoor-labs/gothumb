@@ -44,7 +44,7 @@ func main() {
 			log.Fatal("invalid MAX_AGE setting")
 		}
 	}
-	if rrs := os.Getenv("useRRS"); rrs == "true" || rrs == "1" {
+	if rrs := os.Getenv("USE_RRS"); rrs == "true" || rrs == "1" {
 		useRRS = true
 	}
 
@@ -93,10 +93,20 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 
 	// return stored result
-	w.Header().Set("Content-Type", "image/jpeg") // TODO: use stored content type
-	w.Header().Set("Content-Length", h.Get("Content-Length"))
-	w.Header().Set("ETag", h.Get("Etag"))
-	setCacheHeaders(w)
+	length, err := strconv.Atoi(h.Get("Content-Length"))
+	if err != nil {
+		fmt.Printf("invalid result content-length: %s", err)
+		// TODO: try to generate instead of erroring w/ 500?
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	setResultHeaders(w, &Result{
+		ContentType:   "image/jpeg", // TODO: use stored content type
+		ContentLength: length,
+		ETag:          strings.Trim(h.Get("Etag"), `"`),
+		Path:          req.URL.Path,
+	})
 	if _, err = io.Copy(w, r); err != nil {
 		fmt.Printf("copying from stored result: %s", err)
 		http.Error(w, err.Error(), 500)
@@ -130,23 +140,65 @@ func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL strin
 		return
 	}
 
+	// TODO: crop to fit in desired rectangle w/out losing aspect ratio
 	imgResized := resize.Resize(width, height, img, resize.Bicubic)
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, imgResized, nil); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	w.Header().Set("Content-Type", "image/jpeg")
-	w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
-	w.Header().Set("ETag", `"`+computeHexMD5(buf.Bytes())+`"`)
-	setCacheHeaders(w)
-	if req.Method == "HEAD" {
-		return
-	} else {
+
+	result := &Result{
+		ContentType:   "image/jpeg",
+		ContentLength: buf.Len(),
+		Data:          buf.Bytes(), // TODO: check if I need to copy this
+		ETag:          computeHexMD5(buf.Bytes()),
+		Path:          req.URL.Path,
+	}
+	setResultHeaders(w, result)
+	if req.Method != "HEAD" {
 		if _, err = buf.WriteTo(w); err != nil {
 			log.Printf("writing buffer to response: %s", err)
 		}
 	}
+
+	go storeResult(result)
+}
+
+func setResultHeaders(w http.ResponseWriter, result *Result) {
+	w.Header().Set("Content-Type", result.ContentType)
+	w.Header().Set("Content-Length", strconv.Itoa(result.ContentLength))
+	w.Header().Set("ETag", `"`+result.ETag+`"`)
+	setCacheHeaders(w)
+}
+
+func storeResult(result *Result) {
+	h := make(http.Header)
+	h.Set("Content-Type", result.ContentType)
+	if useRRS {
+		h.Set("x-amz-storage-class", "REDUCED_REDUNDANCY")
+	}
+	w, err := resultBucket.PutWriter(result.Path, h, nil)
+	if err != nil {
+		log.Printf("storing result for %s: %s", result.Path, err)
+		return
+	}
+	defer w.Close()
+	if _, err = w.Write(result.Data); err != nil {
+		log.Printf("storing result for %s: %s", result.Path, err)
+		return
+	}
+	if err = w.Close(); err != nil {
+		log.Printf("storing result for %s: %s", result.Path, err)
+	}
+}
+
+type Result struct {
+	Data          []byte
+	ContentType   string
+	ContentLength int
+	ETag          string
+	Path          string
 }
 
 func computeHexMD5(data []byte) string {
