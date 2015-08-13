@@ -87,13 +87,13 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	path := normalizePath(req.URL.Path)
+	resultPath := normalizePath(strings.TrimPrefix(req.URL.Path, "/"+sig))
 
 	// try to get stored result
-	r, h, err := getStoredResult(req.Method, path)
+	r, h, err := getStoredResult(req.Method, resultPath)
 	if err != nil {
 		log.Printf("getting stored result: %s", err)
-		generateThumbnail(w, req.Method, path, sourceURL.String(), width, height)
+		generateThumbnail(w, req.Method, resultPath, sourceURL.String(), width, height)
 		return
 	}
 	defer r.Close()
@@ -111,7 +111,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		ContentType:   "image/jpeg", // TODO: use stored content type
 		ContentLength: length,
 		ETag:          strings.Trim(h.Get("Etag"), `"`),
-		Path:          path,
+		Path:          resultPath,
 	})
 	if _, err = io.Copy(w, r); err != nil {
 		log.Printf("copying from stored result: %s", err)
@@ -186,7 +186,7 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 	}
 
 	res := &result{
-		ContentType:   "image/jpeg",
+		ContentType:   "image/jpeg", // TODO: use stored content-type
 		ContentLength: len(buf),
 		Data:          buf, // TODO: check if I need to copy this
 		ETag:          computeHexMD5(buf),
