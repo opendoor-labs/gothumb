@@ -21,6 +21,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/nfnt/resize"
+	"github.com/oliamb/cutter"
 	"github.com/rlmcpherson/s3gof3r"
 )
 
@@ -140,8 +141,15 @@ func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL strin
 		return
 	}
 
-	// TODO: crop to fit in desired rectangle w/out losing aspect ratio
-	imgResized := resize.Resize(width, height, img, resize.Bicubic)
+	// crop to final aspect ratio before resizing
+	croppedImg, err := cutter.Crop(img, cutter.Config{
+		Width:   int(width),
+		Height:  int(height),
+		Mode:    cutter.Centered,
+		Options: cutter.Ratio,
+	})
+
+	imgResized := resize.Resize(width, height, croppedImg, resize.Bicubic)
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, imgResized, nil); err != nil {
 		http.Error(w, err.Error(), 500)
