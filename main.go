@@ -33,6 +33,14 @@ var (
 	resultBucket *s3gof3r.Bucket
 )
 
+type ByteSize int64
+
+const (
+	_           = iota // ignore first value by assigning to blank identifier
+	KB ByteSize = 1 << (10 * iota)
+	MB
+)
+
 func main() {
 	log.SetFlags(0) // hide timestamps from Go logs
 	securityKey = []byte(mustGetenv("SECURITY_KEY"))
@@ -53,6 +61,8 @@ func main() {
 		log.Fatal(err)
 	}
 	resultBucket = s3gof3r.New(s3gof3r.DefaultDomain, keys).Bucket(resultBucketName)
+	resultBucket.Concurrency = 4
+	resultBucket.PartSize = int64(2 * MB)
 	resultBucket.Md5Check = false
 	httpClient = resultBucket.Client
 
