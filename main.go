@@ -60,7 +60,11 @@ func main() {
 	router := httprouter.New()
 	router.HEAD("/:signature/:size/*source", handleResize)
 	router.GET("/:signature/:size/*source", handleResize)
-	log.Fatal(http.ListenAndServe(":8888", router))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8888"
+	}
+	log.Fatal(http.ListenAndServe(":"+port, router))
 }
 
 func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
