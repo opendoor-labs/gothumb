@@ -115,7 +115,6 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	})
 	if _, err = io.Copy(w, r); err != nil {
 		log.Printf("copying from stored result: %s", err)
-		http.Error(w, err.Error(), 500)
 		return
 	}
 	if err = r.Close(); err != nil {
