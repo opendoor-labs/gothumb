@@ -175,7 +175,7 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		Height:       int(height),
 		Width:        int(width),
 		Crop:         true,
-		Interpolator: vips.BILINEAR,
+		Interpolator: vips.BICUBIC,
 		Gravity:      vips.CENTRE,
 		Quality:      95,
 	})
