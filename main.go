@@ -34,6 +34,7 @@ var (
 )
 
 func main() {
+	log.SetFlags(0) // hide timestamps from Go logs
 	securityKey = []byte(mustGetenv("SECURITY_KEY"))
 	resultBucketName = mustGetenv("RESULT_STORAGE_BUCKET")
 
