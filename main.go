@@ -100,7 +100,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	// return stored result
 	length, err := strconv.Atoi(h.Get("Content-Length"))
 	if err != nil {
-		fmt.Printf("invalid result content-length: %s", err)
+		log.Printf("invalid result content-length: %s", err)
 		// TODO: try to generate instead of erroring w/ 500?
 		http.Error(w, err.Error(), 500)
 		return
@@ -113,13 +113,14 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		Path:          req.URL.Path,
 	})
 	if _, err = io.Copy(w, r); err != nil {
-		fmt.Printf("copying from stored result: %s", err)
+		log.Printf("copying from stored result: %s", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
 }
 
 func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL string, width, height uint) {
+	log.Printf("generating %s", req.URL.Path)
 	resp, err := httpClient.Get(sourceURL)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
