@@ -1,16 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -20,9 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/DAddYE/vips"
 	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/julienschmidt/httprouter"
-	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/nfnt/resize"
-	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/oliamb/cutter"
 	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/rlmcpherson/s3gof3r"
 )
 
@@ -168,37 +165,35 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		return
 	}
 
-	img, _, err := image.Decode(resp.Body)
+	img, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	// crop to final aspect ratio before resizing
-	croppedImg, err := cutter.Crop(img, cutter.Config{
-		Width:   int(width),
-		Height:  int(height),
-		Mode:    cutter.Centered,
-		Options: cutter.Ratio,
+	buf, err := vips.Resize(img, vips.Options{
+		Height:       int(height),
+		Width:        int(width),
+		Crop:         true,
+		Interpolator: vips.BILINEAR,
+		Gravity:      vips.CENTRE,
+		Quality:      95,
 	})
-
-	imgResized := resize.Resize(width, height, croppedImg, resize.Bicubic)
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, imgResized, nil); err != nil {
-		http.Error(w, err.Error(), 500)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("resizing image: %s", err.Error()), 500)
 		return
 	}
 
 	res := &result{
 		ContentType:   "image/jpeg",
-		ContentLength: buf.Len(),
-		Data:          buf.Bytes(), // TODO: check if I need to copy this
-		ETag:          computeHexMD5(buf.Bytes()),
+		ContentLength: len(buf),
+		Data:          buf, // TODO: check if I need to copy this
+		ETag:          computeHexMD5(buf),
 		Path:          rpath,
 	}
 	setResultHeaders(w, res)
 	if rmethod != "HEAD" {
-		if _, err = buf.WriteTo(w); err != nil {
+		if _, err = w.Write(buf); err != nil {
 			log.Printf("writing buffer to response: %s", err)
 		}
 	}
