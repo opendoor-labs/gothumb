@@ -297,7 +297,7 @@ func validateSignature(sig, pathPart string) error {
 	if _, err := h.Write([]byte(pathPart)); err != nil {
 		return err
 	}
-	actualSig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	actualSig := base64.URLEncoding.EncodeToString(h.Sum(nil))
 	// constant-time string comparison
 	if subtle.ConstantTimeCompare([]byte(sig), []byte(actualSig)) != 1 {
 		return fmt.Errorf("signature mismatch")
