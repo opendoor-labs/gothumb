@@ -178,7 +178,7 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		Crop:         true,
 		Interpolator: vips.BICUBIC,
 		Gravity:      vips.CENTRE,
-		Quality:      95,
+		Quality:      70,
 	})
 	if err != nil {
 		http.Error(w, fmt.Sprintf("resizing image: %s", err.Error()), 500)
