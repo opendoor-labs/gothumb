@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
-	"github.com/nfnt/resize"
-	"github.com/oliamb/cutter"
-	"github.com/rlmcpherson/s3gof3r"
+	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/julienschmidt/httprouter"
+	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/nfnt/resize"
+	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/oliamb/cutter"
+	"github.com/opendoor-labs/gothumb/Godeps/_workspace/src/github.com/rlmcpherson/s3gof3r"
 )
 
 var (
