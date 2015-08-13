@@ -96,6 +96,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		generateThumbnail(w, req, sourceURL.String(), width, height)
 		return
 	}
+	defer r.Close()
 
 	// return stored result
 	length, err := strconv.Atoi(h.Get("Content-Length"))
@@ -116,6 +117,9 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		log.Printf("copying from stored result: %s", err)
 		http.Error(w, err.Error(), 500)
 		return
+	}
+	if err = r.Close(); err != nil {
+		log.Printf("closing stored result copy: %s", err)
 	}
 }
 
