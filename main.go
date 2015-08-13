@@ -54,7 +54,7 @@ func main() {
 		log.Fatal(err)
 	}
 	resultBucket = s3gof3r.New(s3gof3r.DefaultDomain, keys).Bucket(resultBucketName)
-	resultBucket.Md5Check = true
+	resultBucket.Md5Check = false
 	httpClient = resultBucket.Client
 
 	router := httprouter.New()
