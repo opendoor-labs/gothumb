@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -88,12 +89,13 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	// TODO(bgentry): normalize path. Support for custom root path? ala RESULT_STORAGE_AWS_STORAGE_ROOT_PATH
+	path := normalizePath(req.URL.Path)
 
 	// try to get stored result
-	r, h, err := resultBucket.GetReader(req.URL.Path, nil)
+	r, h, err := getStoredResult(req.Method, path)
 	if err != nil {
-		generateThumbnail(w, req, sourceURL.String(), width, height)
+		log.Printf("getting stored result: %s", err)
+		generateThumbnail(w, req.Method, path, sourceURL.String(), width, height)
 		return
 	}
 	defer r.Close()
@@ -111,7 +113,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		ContentType:   "image/jpeg", // TODO: use stored content type
 		ContentLength: length,
 		ETag:          strings.Trim(h.Get("Etag"), `"`),
-		Path:          req.URL.Path,
+		Path:          path,
 	})
 	if _, err = io.Copy(w, r); err != nil {
 		log.Printf("copying from stored result: %s", err)
@@ -123,8 +125,8 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 }
 
-func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL string, width, height uint) {
-	log.Printf("generating %s", req.URL.Path)
+func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL string, width, height uint) {
+	log.Printf("generating %s", rpath)
 	resp, err := httpClient.Get(sourceURL)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -170,10 +172,10 @@ func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL strin
 		ContentLength: buf.Len(),
 		Data:          buf.Bytes(), // TODO: check if I need to copy this
 		ETag:          computeHexMD5(buf.Bytes()),
-		Path:          req.URL.Path,
+		Path:          rpath,
 	}
 	setResultHeaders(w, res)
-	if req.Method != "HEAD" {
+	if rmethod != "HEAD" {
 		if _, err = buf.WriteTo(w); err != nil {
 			log.Printf("writing buffer to response: %s", err)
 		}
@@ -182,6 +184,36 @@ func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL strin
 	go storeResult(res)
 }
 
+// caller is responsible for closing the returned ReadCloser
+func getStoredResult(method, path string) (io.ReadCloser, http.Header, error) {
+	if method != "HEAD" {
+		return resultBucket.GetReader(path, nil)
+	}
+
+	s3URL := fmt.Sprintf("https://%s.s3.amazonaws.com%s", resultBucketName, path)
+	req, err := http.NewRequest(method, s3URL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resultBucket.Sign(req)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		// TODO: drain res.Body to ioutil.Discard before closing?
+		res.Body.Close()
+		return nil, nil, fmt.Errorf("unexpected status code %d", res.StatusCode)
+	}
+	res.Header.Set("Content-Length", strconv.FormatInt(res.ContentLength, 10))
+	return res.Body, res.Header, err
+}
+
+func normalizePath(p string) string {
+	// TODO(bgentry): Support for custom root path? ala RESULT_STORAGE_AWS_STORAGE_ROOT_PATH
+	return path.Clean(p)
+}
 func setResultHeaders(w http.ResponseWriter, result *result) {
 	w.Header().Set("Content-Type", result.ContentType)
 	w.Header().Set("Content-Length", strconv.Itoa(result.ContentLength))
