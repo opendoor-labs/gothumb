@@ -102,7 +102,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	setResultHeaders(w, &Result{
+	setResultHeaders(w, &result{
 		ContentType:   "image/jpeg", // TODO: use stored content type
 		ContentLength: length,
 		ETag:          strings.Trim(h.Get("Etag"), `"`),
@@ -156,52 +156,52 @@ func generateThumbnail(w http.ResponseWriter, req *http.Request, sourceURL strin
 		return
 	}
 
-	result := &Result{
+	res := &result{
 		ContentType:   "image/jpeg",
 		ContentLength: buf.Len(),
 		Data:          buf.Bytes(), // TODO: check if I need to copy this
 		ETag:          computeHexMD5(buf.Bytes()),
 		Path:          req.URL.Path,
 	}
-	setResultHeaders(w, result)
+	setResultHeaders(w, res)
 	if req.Method != "HEAD" {
 		if _, err = buf.WriteTo(w); err != nil {
 			log.Printf("writing buffer to response: %s", err)
 		}
 	}
 
-	go storeResult(result)
+	go storeResult(res)
 }
 
-func setResultHeaders(w http.ResponseWriter, result *Result) {
+func setResultHeaders(w http.ResponseWriter, result *result) {
 	w.Header().Set("Content-Type", result.ContentType)
 	w.Header().Set("Content-Length", strconv.Itoa(result.ContentLength))
 	w.Header().Set("ETag", `"`+result.ETag+`"`)
 	setCacheHeaders(w)
 }
 
-func storeResult(result *Result) {
+func storeResult(res *result) {
 	h := make(http.Header)
-	h.Set("Content-Type", result.ContentType)
+	h.Set("Content-Type", res.ContentType)
 	if useRRS {
 		h.Set("x-amz-storage-class", "REDUCED_REDUNDANCY")
 	}
-	w, err := resultBucket.PutWriter(result.Path, h, nil)
+	w, err := resultBucket.PutWriter(res.Path, h, nil)
 	if err != nil {
-		log.Printf("storing result for %s: %s", result.Path, err)
+		log.Printf("storing result for %s: %s", res.Path, err)
 		return
 	}
 	defer w.Close()
-	if _, err = w.Write(result.Data); err != nil {
-		log.Printf("storing result for %s: %s", result.Path, err)
+	if _, err = w.Write(res.Data); err != nil {
+		log.Printf("storing result for %s: %s", res.Path, err)
 		return
 	}
 	if err = w.Close(); err != nil {
-		log.Printf("storing result for %s: %s", result.Path, err)
+		log.Printf("storing result for %s: %s", res.Path, err)
 	}
 }
 
-type Result struct {
+type result struct {
 	Data          []byte
 	ContentType   string
 	ContentLength int
