@@ -1,0 +1,28 @@
+{
+	"ImportPath": "github.com/opendoor-labs/gothumb",
+	"GoVersion": "go1.5rc1",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/julienschmidt/httprouter",
+			"Comment": "v1.1-3-g6aacfd5",
+			"Rev": "6aacfd5ab513e34f7e64ea9627ab9670371b34e7"
+		},
+		{
+			"ImportPath": "github.com/nfnt/resize",
+			"Rev": "dc93e1b98c579d90ee2fa15c1fd6dac34f6e7899"
+		},
+		{
+			"ImportPath": "github.com/oliamb/cutter",
+			"Comment": "v0.2.0-5-g6077273",
+			"Rev": "607727381334f0974bf70eeec14d034bd027999e"
+		},
+		{
+			"ImportPath": "github.com/rlmcpherson/s3gof3r",
+			"Comment": "v0.4.10-10-g4ecf3c1",
+			"Rev": "4ecf3c16aa1ebde1a25b2d4240595010598fd5d6"
+		}
+	]
+}
