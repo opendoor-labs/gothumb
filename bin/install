@@ -1,0 +1,13 @@
+#!/bin/bash
+
+brew install --devel go
+brew tap homebrew/science
+brew install vips
+if [ -z $GOPATH ]; then
+  echo "ERROR cannot complete install you need to set your \$GOPATH"
+  echo "As of go 1.2, a valid GOPATH is required to use the `go get` command:"
+  echo "https://golang.org/doc/code.html#GOPATH"
+  exit 1
+fi
+go get github.com/tools/godep
+go get github.com/opendoor-labs/gothumb
