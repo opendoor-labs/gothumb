@@ -118,7 +118,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 
 	setResultHeaders(w, &result{
-		ContentType:   "image/jpeg", // TODO: use stored content type
+		ContentType:   h.Get("Content-Type"),
 		ContentLength: length,
 		ETag:          strings.Trim(h.Get("Etag"), `"`),
 		Path:          resultPath,
@@ -146,14 +146,6 @@ func computeHexMD5(data []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func copyHeader(dst, src http.Header) {
-	for k, vv := range src {
-		for _, v := range vv {
-			dst.Add(k, v)
-		}
-	}
-}
-
 func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL string, width, height uint) {
 	log.Printf("generating %s", rpath)
 	resp, err := httpClient.Get(sourceURL)
@@ -164,14 +156,8 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		copyHeader(w.Header(), resp.Header)
-		io.Copy(w, resp.Body)
-		return
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "image/") {
-		http.Error(w, fmt.Sprintf("invalid content type %q", contentType), 500)
+		log.Printf("unexpected status code from source: %d", resp.StatusCode)
+		http.Error(w, "", resp.StatusCode)
 		return
 	}
 
@@ -195,7 +181,7 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 	}
 
 	res := &result{
-		ContentType:   "image/jpeg", // TODO: use stored content-type
+		ContentType:   "image/jpeg", // TODO: support PNGs as well
 		ContentLength: len(buf),
 		Data:          buf, // TODO: check if I need to copy this
 		ETag:          computeHexMD5(buf),
