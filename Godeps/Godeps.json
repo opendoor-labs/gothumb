@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/opendoor-labs/gothumb",
-	"GoVersion": "go1.5rc1",
+	"GoVersion": "go1.5",
 	"Packages": [
 		"./..."
 	],
