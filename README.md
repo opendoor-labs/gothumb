@@ -13,4 +13,4 @@ A very fast [golang](http://golang.org/) port of [thumbor](https://github.com/th
 - [ ] Parallel source file fetching
 - [ ] Other storage engines
 - [ ] Tests
-- [ ] Unsafe mode
+- [x] Unsafe mode
