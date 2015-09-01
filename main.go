@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"crypto/subtle"
 	"encoding/base64"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,12 +25,14 @@ import (
 )
 
 var (
+	listenInterface  string
 	maxAge           int
 	securityKey      []byte
 	resultBucketName string
 	useRRS           bool
+	unsafeMode       bool
 
-	httpClient   *http.Client
+	httpClient   = http.DefaultClient
 	resultBucket *s3gof3r.Bucket
 )
 
@@ -43,8 +46,39 @@ const (
 
 func main() {
 	log.SetFlags(0) // hide timestamps from Go logs
-	securityKey = []byte(mustGetenv("SECURITY_KEY"))
-	resultBucketName = mustGetenv("RESULT_STORAGE_BUCKET")
+
+	parseFlags()
+
+	resultBucketName = os.Getenv("RESULT_STORAGE_BUCKET")
+	if resultBucketName != "" {
+		keys, err := s3gof3r.EnvKeys()
+		if err != nil {
+			log.Fatal(err)
+		}
+		resultBucket = s3gof3r.New(s3gof3r.DefaultDomain, keys).Bucket(resultBucketName)
+		resultBucket.Concurrency = 4
+		resultBucket.PartSize = int64(2 * MB)
+		resultBucket.Md5Check = false
+		httpClient = resultBucket.Client
+
+		if rrs := os.Getenv("USE_RRS"); rrs == "true" || rrs == "1" {
+			useRRS = true
+		}
+	}
+
+	router := httprouter.New()
+	router.HEAD("/:signature/:size/*source", handleResize)
+	router.GET("/:signature/:size/*source", handleResize)
+	log.Fatal(http.ListenAndServe(listenInterface, router))
+}
+
+func parseFlags() {
+	securityKeyStr := ""
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8888"
+	}
 
 	if maxAgeStr := os.Getenv("MAX_AGE"); maxAgeStr != "" {
 		var err error
@@ -52,28 +86,18 @@ func main() {
 			log.Fatal("invalid MAX_AGE setting")
 		}
 	}
-	if rrs := os.Getenv("USE_RRS"); rrs == "true" || rrs == "1" {
-		useRRS = true
-	}
 
-	keys, err := s3gof3r.EnvKeys()
-	if err != nil {
-		log.Fatal(err)
-	}
-	resultBucket = s3gof3r.New(s3gof3r.DefaultDomain, keys).Bucket(resultBucketName)
-	resultBucket.Concurrency = 4
-	resultBucket.PartSize = int64(2 * MB)
-	resultBucket.Md5Check = false
-	httpClient = resultBucket.Client
+	flag.StringVar(&listenInterface, "l", ":"+port, "listen address")
+	flag.IntVar(&maxAge, "max-age", maxAge, "the maximum HTTP caching age to use on returned images")
+	flag.StringVar(&securityKeyStr, "k", os.Getenv("SECURITY_KEY"), "security key")
+	flag.BoolVar(&unsafeMode, "unsafe", false, "whether to allow /unsafe URLs")
 
-	router := httprouter.New()
-	router.HEAD("/:signature/:size/*source", handleResize)
-	router.GET("/:signature/:size/*source", handleResize)
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8888"
+	flag.Parse()
+
+	if securityKeyStr == "" && !unsafeMode {
+		log.Fatalf("must provide a security key with -k or allow unsafe URLs")
 	}
-	log.Fatal(http.ListenAndServe(":"+port, router))
+	securityKey = []byte(securityKeyStr)
 }
 
 func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -98,6 +122,14 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 
 	resultPath := normalizePath(strings.TrimPrefix(req.URL.Path, "/"+sig))
+
+	// TODO(bgentry): everywhere that switches on resultBucket should switch on
+	// something like resultStorage instead.
+	if resultBucket == nil {
+		// no result storage, just generate the thumbnail
+		generateThumbnail(w, req.Method, resultPath, sourceURL.String(), width, height)
+		return
+	}
 
 	// try to get stored result
 	r, h, err := getStoredResult(req.Method, resultPath)
@@ -194,7 +226,9 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		}
 	}
 
-	go storeResult(res)
+	if resultBucket != nil {
+		go storeResult(res)
+	}
 }
 
 // caller is responsible for closing the returned ReadCloser
@@ -289,6 +323,10 @@ func storeResult(res *result) {
 }
 
 func validateSignature(sig, pathPart string) error {
+	if unsafeMode && sig == "unsafe" {
+		return nil
+	}
+
 	h := hmac.New(sha1.New, securityKey)
 	if _, err := h.Write([]byte(pathPart)); err != nil {
 		return err
