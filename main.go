@@ -101,7 +101,7 @@ func parseFlags() {
 }
 
 func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	log.Printf(req.Method + " " + req.URL.Path)
+	log.Printf("%s %s", req.Method, reqPath)
 	sourceURL, err := url.Parse(strings.TrimPrefix(params.ByName("source"), "/"))
 	if err != nil || !(sourceURL.Scheme == "http" || sourceURL.Scheme == "https") {
 		http.Error(w, "invalid source URL", 400)
