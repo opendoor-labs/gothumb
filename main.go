@@ -101,7 +101,8 @@ func parseFlags() {
 }
 
 func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
-	log.Printf(req.Method + " " + req.URL.Path)
+	reqPath := req.URL.EscapedPath()
+	log.Printf("%s %s", req.Method, reqPath)
 	sourceURL, err := url.Parse(strings.TrimPrefix(params.ByName("source"), "/"))
 	if err != nil || !(sourceURL.Scheme == "http" || sourceURL.Scheme == "https") {
 		http.Error(w, "invalid source URL", 400)
@@ -109,7 +110,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 	}
 
 	sig := params.ByName("signature")
-	pathToVerify := strings.TrimPrefix(req.URL.Path, "/"+sig+"/")
+	pathToVerify := strings.TrimPrefix(reqPath, "/"+sig+"/")
 	if err := validateSignature(sig, pathToVerify); err != nil {
 		http.Error(w, "invalid signature", 401)
 		return
@@ -121,7 +122,7 @@ func handleResize(w http.ResponseWriter, req *http.Request, params httprouter.Pa
 		return
 	}
 
-	resultPath := normalizePath(strings.TrimPrefix(req.URL.Path, "/"+sig))
+	resultPath := normalizePath(strings.TrimPrefix(reqPath, "/"+sig))
 
 	// TODO(bgentry): everywhere that switches on resultBucket should switch on
 	// something like resultStorage instead.
