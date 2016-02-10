@@ -209,7 +209,11 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		Quality:      50,
 	})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("resizing image: %s", err.Error()), 500)
+		responseCode := 500
+		if err.Error() == "unknown image format" {
+			responseCode = 400
+		}
+		http.Error(w, fmt.Sprintf("resizing image: %s", err.Error()), responseCode)
 		return
 	}
 
