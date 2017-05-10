@@ -1,23 +1,21 @@
 {
 	"ImportPath": "github.com/opendoor-labs/gothumb",
-	"GoVersion": "go1.8",
+	"GoVersion": "go1.7",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/DAddYE/vips",
-			"Rev": "40d1f99169ba1801a1e883aec947596e1d341296"
+			"Rev": "87cfaf94f7a1b5dd0057a7dcea54d901f6ee5f62"
 		},
 		{
 			"ImportPath": "github.com/julienschmidt/httprouter",
-			"Comment": "v1.1-3-g6aacfd5",
-			"Rev": "6aacfd5ab513e34f7e64ea9627ab9670371b34e7"
+			"Rev": "975b5c4c7c21c0e3d2764200bf2aa8e34657ae6e"
 		},
 		{
 			"ImportPath": "github.com/rlmcpherson/s3gof3r",
-			"Comment": "v0.4.10-10-g4ecf3c1",
-			"Rev": "4ecf3c16aa1ebde1a25b2d4240595010598fd5d6"
+			"Rev": "864ae0bf7cf2e20c0002b7ea17f4d84fec1abc14"
 		}
 	]
 }
