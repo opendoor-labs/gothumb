@@ -1,9 +1,7 @@
 {
 	"ImportPath": "github.com/opendoor-labs/gothumb",
-	"GoVersion": "go1.7",
-	"Packages": [
-		"./..."
-	],
+	"GoVersion": "go1.8",
+  "GodepVersion": "v79",
 	"Deps": [
 		{
 			"ImportPath": "github.com/DAddYE/vips",
