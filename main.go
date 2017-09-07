@@ -204,7 +204,6 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		Height:       int(height),
 		Width:        int(width),
 		Gravity:      bimg.GravityCentre,
-		Crop:         true,
 		Interpolator: bimg.Bicubic,
 		Quality:      50,
 	})
