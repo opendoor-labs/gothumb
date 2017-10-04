@@ -45,7 +45,6 @@ const (
 )
 
 func main() {
-	bimg.Initialize()
 	log.SetFlags(0) // hide timestamps from Go logs
 
 	parseFlags()
@@ -181,7 +180,7 @@ func computeHexMD5(data []byte) string {
 }
 
 func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL string, width, height uint) {
-	log.Printf("generating FYEAH %s", rpath)
+	log.Printf("generating %s", rpath)
 	resp, err := httpClient.Get(sourceURL)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
