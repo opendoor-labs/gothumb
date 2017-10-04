@@ -46,7 +46,9 @@ const (
 
 func main() {
 	log.SetFlags(0) // hide timestamps from Go logs
-
+	vips.Startup(&vips.Config{
+		ConcurrencyLevel: 1,
+	})
 	parseFlags()
 
 	resultBucketName = os.Getenv("RESULT_STORAGE_BUCKET")
