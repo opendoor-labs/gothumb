@@ -6,7 +6,7 @@ ENV LIBVIPS_VERSION_MINOR 5
 ENV LIBVIPS_VERSION_PATCH 8
 ENV LIBVIPS_VERSION $LIBVIPS_VERSION_MAJOR.$LIBVIPS_VERSION_MINOR.$LIBVIPS_VERSION_PATCH
 
-# Install dependencies
+# Install dependencies and vips
 RUN apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
   automake build-essential curl \
@@ -14,8 +14,6 @@ RUN apt-get update && \
   libwebp-dev libtiff5-dev libgif-dev libexif-dev libxml2-dev libpoppler-glib-dev \
   swig libmagickwand-dev libpango1.0-dev libmatio-dev libopenslide-dev libcfitsio3-dev \
   libgsf-1-dev fftw3-dev liborc-0.4-dev librsvg2-dev && \
-
-  # Build libvips
   cd /tmp && \
   curl -L https://github.com/jcupitt/libvips/releases/download/v$LIBVIPS_VERSION/vips-$LIBVIPS_VERSION.tar.gz | tar xz && \
   cd /tmp/vips-$LIBVIPS_VERSION && \
@@ -23,8 +21,6 @@ RUN apt-get update && \
   make && \
   make install && \
   ldconfig && \
-
-  # Clean up
   apt-get remove -y curl automake build-essential && \
   apt-get autoremove -y && \
   apt-get autoclean && \
