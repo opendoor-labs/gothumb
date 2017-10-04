@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DAddYE/vips"
+	"github.com/davidbyttow/govips"
 	"github.com/julienschmidt/httprouter"
 	"github.com/rlmcpherson/s3gof3r"
 )
@@ -200,14 +200,14 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 		return
 	}
 
-	buf, err := vips.Resize(img, vips.Options{
-		Height:       int(height),
-		Width:        int(width),
-		Crop:         true,
-		Interpolator: vips.BICUBIC,
-		Gravity:      vips.CENTRE,
-		Quality:      50,
-	})
+	buf, err := vips.NewPipeline().
+		LoadBuffer(img).
+		Resize(int(width), int(height)).
+		ResizeStrategy(vips.ResizeStrategyCrop).
+		Interpolator(vips.InterpolateBicubic).
+		Anchor(vips.AnchorCenter).
+		Output()
+
 	if err != nil {
 		responseCode := 500
 		if err.Error() == "unknown image format" {
