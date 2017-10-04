@@ -20,7 +20,15 @@ A very fast [golang](http://golang.org/) port of [thumbor](https://github.com/th
 Gothumb is on k8bs. Refer to [opendoor-gothumb](https://github.com/opendoor-labs/opendoor-gothumb)
 
 ### TEST
-Testing in staging:
+#### LOCAL:
+Run
+```
+$ cd .
+$ go run main.go -unsafe=true
+```
+Call `localhost:8888/unsafe/0x500/https://listing-photos-production.s3.amazonaws.com/uploads/work_order_item-237397/1675177-g8UBAKwT8dw.jpg` from your browser.
+
+#### STAGING:
 
 Build the docker image by
 ```
