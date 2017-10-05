@@ -1,6 +1,6 @@
 #!/bin/bash
 
-brew install --devel go
+brew install go@1.9
 brew tap homebrew/science
 brew install vips
 if [ -z $GOPATH ]; then
