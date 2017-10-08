@@ -1,0 +1,66 @@
+dist: trusty
+sudo: true
+
+language: generic
+
+# All PRs already get a build.
+# This restricts only master to get a build for pushes.
+branches:
+  only:
+    - master
+
+services:
+  - docker
+
+# publish to opendoor gothumb on non-master branch
+stages:
+  - name: publish to opendoor-gothumb
+    if: (branch = master) AND (type = pull_request)
+  - name: publish to gothumb
+    if: (branch = master) AND (type != pull_request)
+
+install: true
+
+before_install:
+  - docker --version
+  - docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PASS"
+
+jobs:
+  include:
+    - stage: publish to opendoor-gothumb
+      install:
+        - docker pull opendoor/gothumb:master-latest
+        - docker build -t gothumb-local --file=Dockerfile . --cache-from opendoor/gothumb:master-latest
+        - docker history gothumb-local
+      script:
+        - IMAGE_REPO_NAME="opendoor-gothumb" # e.g. opendoor-labs/myrepo => opendoor-myrepo
+        - echo "$IMAGE_REPO_NAME"
+        - echo "$TRAVIS_COMMIT" > GIT_DEPLOY_SHA
+        - docker build -t "opendoor/opendoor-gothumb:${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from opendoor-gothumb-local
+        - docker push "opendoor/opendoor-gothumb:${TRAVIS_COMMIT:0:7}"
+          # By default Travis builds the merge commit of the HEAD of the PR with the base branch.
+          # This is a bit confusing as the commit sha which is built is not present in the repo itself;
+          # it's the transient merge commit with base. This behavior is good for unit tests, but
+          # strange for building images.
+          # ref: https://docs.travis-ci.com/user/pull-requests#How-Pull-Requests-are-Tested
+        - if [ -n "$TRAVIS_PULL_REQUEST_SHA" ]; then
+            git checkout "$TRAVIS_PULL_REQUEST_SHA";
+            echo "$TRAVIS_PULL_REQUEST_SHA" > GIT_DEPLOY_SHA;
+            docker build -t "opendoor/opendoor-gothumb:${TRAVIS_PULL_REQUEST_SHA:0:7}" --file=Dockerfile . --cache-from gothumb-local;
+            docker push "opendoor/opendoor-gothumb:${TRAVIS_PULL_REQUEST_SHA:0:7}";
+          fi
+    - stage: publish to gothumb
+      install:
+        - docker pull opendoor/gothumb:master-latest
+        - docker build -t gothumb-local --file=Dockerfile . --cache-from opendoor/gothumb:master-latest
+        - docker history gothumb-local
+      script:
+        - echo "$TRAVIS_COMMIT" > GIT_DEPLOY_SHA
+        - docker build -t "opendoor/gothumb:${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from gothumb-local
+        - docker push "opendoor/gothumb:${TRAVIS_COMMIT:0:7}"
+        - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]; then
+            docker build -t "opendoor/gothumb:master-${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from gothumb-local;
+            docker push "opendoor/gothumb:master-${TRAVIS_COMMIT:0:7}";
+            docker build -t "opendoor/gothumb:master-latest" --file=Dockerfile . --cache-from gothumb-local;
+            docker push "opendoor/$IMAGE_REPO_NAME:master-latest";
+          fi
