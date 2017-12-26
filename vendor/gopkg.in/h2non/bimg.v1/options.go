@@ -41,12 +41,15 @@ const (
 	Bilinear
 	// Nohalo interpolation value.
 	Nohalo
+	// Nearest neighbour interpolation value.
+	Nearest
 )
 
 var interpolations = map[Interpolator]string{
 	Bicubic:  "bicubic",
 	Bilinear: "bilinear",
 	Nohalo:   "nohalo",
+	Nearest:  "nearest",
 }
 
 func (i Interpolator) String() string {
@@ -195,7 +198,7 @@ type Options struct {
 	Compression    int
 	Zoom           int
 	Crop           bool
-	SmartCrop      bool // Deprecated
+	SmartCrop      bool // Deprecated, use: bimg.Options.Gravity = bimg.GravitySmart
 	Enlarge        bool
 	Embed          bool
 	Flip           bool
@@ -206,6 +209,7 @@ type Options struct {
 	Interlace      bool
 	StripMetadata  bool
 	Trim           bool
+	Lossless       bool
 	Extend         Extend
 	Rotate         Angle
 	Background     Color
@@ -217,5 +221,6 @@ type Options struct {
 	Interpretation Interpretation
 	GaussianBlur   GaussianBlur
 	Sharpen        Sharpen
+	Threshold      float64
 	OutputICC      string
 }

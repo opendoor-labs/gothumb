@@ -80,10 +80,8 @@ func InstanceKeys() (keys Keys, err error) {
 
 // EnvKeys Reads the AWS keys from the environment
 func EnvKeys() (keys Keys, err error) {
-	keys = Keys{
-		AccessKey:     os.Getenv("AWS_ACCESS_KEY_ID"),
-		SecretKey:     os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		SecurityToken: os.Getenv("AWS_SECURITY_TOKEN"),
+	keys = Keys{AccessKey: os.Getenv("AWS_ACCESS_KEY_ID"),
+		SecretKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
 	}
 	if keys.AccessKey == "" || keys.SecretKey == "" {
 		err = fmt.Errorf("keys not set in environment: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY")
