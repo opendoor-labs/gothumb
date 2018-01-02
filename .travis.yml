@@ -17,7 +17,7 @@ stages:
   - name: publish to opendoor-gothumb
     if: (branch = master) AND (type = pull_request)
   - name: publish to gothumb
-    if: (branch = master) AND (type != pull_request)
+    if: (branch = master) AND (type = pull_request)
 
 install: true
 
