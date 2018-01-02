@@ -1,5 +1,4 @@
 // +build go1.7
-// must use files from vendor. resize.go and resize_legacy.go
 
 package bimg
 

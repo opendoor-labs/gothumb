@@ -1,4 +1,42 @@
 
+## v1.0.18 / 2017-12-22
+
+  * Merge pull request #216 from Bynder/master
+  * Merge pull request #208 from mikestead/feature/webp-lossless
+  * Remove go-debug usage
+  * refactor(docs): remove codesponsor :(
+  * fix(options): use float64 type in Options.Threshold
+  * Merge pull request #206 from tstm/add-trim-options
+  * Add lossless option for saving webp
+  * Set the test file to write its own file
+  * Add the option to use background and threshold options on trim
+
+## v1.0.17 / 2017-11-14
+
+  * refactor(resizer): remove fmt statement
+  * fix(type_test): use string formatting
+  * Merge pull request #207 from traum-ferienwohnungen/nearest-neighbour
+  * Add nearest-neighbour interpolation
+  * Merge pull request #203 from traum-ferienwohnungen/fix_icc_memory_leak
+  * Fix memory leak on icc_transform
+
+## v1.0.16 / 2017-10-30
+
+  * fix(travis): use install directive
+  * Merge branch 'master' of https://github.com/h2non/bimg
+  * feat: add Gopkg manifests, move fixtures to testdata, add vendor dependencies
+  * Merge pull request #202 from openskydoor/openskydoor/fix-build-tag
+  * fix build tag
+  * fix(#199): presinstall.sh tarball download URL
+
+## v1.0.15 / 2017-10-05
+
+  * Merge pull request #198 from greut/webpload
+  * Add shrink-on-load for webp.
+  * Merge pull request #197 from greut/typos
+  * Small typo.
+  * feat(docs): add codesponsor
+
 ## v1.0.14 / 2017-09-12
 
   * Merge pull request #192 from greut/trim

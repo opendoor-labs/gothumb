@@ -16,9 +16,7 @@ import (
 	"time"
 )
 
-const versionParam = "versionId"
-
-var regionMatcher = regexp.MustCompile("s3[-.]([a-z0-9-]+).amazonaws.com([.a-z0-9]*)")
+var regionMatcher = regexp.MustCompile("s3-([a-z0-9-]+).amazonaws.com")
 
 // S3 contains the domain or endpoint of an S3-compatible service and
 // the authentication keys for that service.
@@ -29,22 +27,16 @@ type S3 struct {
 
 // Region returns the service region infering it from S3 domain.
 func (s *S3) Region() string {
-	region := os.Getenv("AWS_REGION")
 	switch s.Domain {
 	case "s3.amazonaws.com", "s3-external-1.amazonaws.com":
 		return "us-east-1"
-	case "s3-accelerate.amazonaws.com":
-		if region == "" {
-			panic("can't find endpoint region")
-		}
-		return region
 	default:
 		regions := regionMatcher.FindStringSubmatch(s.Domain)
 		if len(regions) < 2 {
-			if region == "" {
-				panic("can't find endpoint region")
+			if region := os.Getenv("AWS_REGION"); region != "" {
+				return region
 			}
-			return region
+			panic("can't find endpoint region")
 		}
 		return regions[1]
 	}
@@ -111,8 +103,6 @@ func (s *S3) Bucket(name string) *Bucket {
 // Header data from the downloaded object is also returned, useful for reading object metadata.
 // DefaultConfig is used if c is nil
 // Callers should call Close on r to ensure that all resources are released.
-//
-// To specify an object version in a versioned bucket, the version ID may be included in the path as a url parameter. See http://docs.aws.amazon.com/AmazonS3/latest/dev/RetrievingObjectVersions.html
 func (b *Bucket) GetReader(path string, c *Config) (r io.ReadCloser, h http.Header, err error) {
 	if path == "" {
 		return nil, nil, errors.New("empty path requested")
@@ -146,38 +136,24 @@ func (b *Bucket) PutWriter(path string, h http.Header, c *Config) (w io.WriteClo
 }
 
 // url returns a parsed url to the given path. c must not be nil
+// Note: Urls containing some special characters will fail due to net/http bug.
+// See https://code.google.com/p/go/issues/detail?id=5684
 func (b *Bucket) url(bPath string, c *Config) (*url.URL, error) {
-
-	// parse versionID parameter from path, if included
-	// See https://github.com/rlmcpherson/s3gof3r/issues/84 for rationale
-	purl, err := url.Parse(bPath)
+	u, err := url.Parse(bPath)
 	if err != nil {
 		return nil, err
 	}
-	var vals url.Values
-	if v := purl.Query().Get(versionParam); v != "" {
-		vals = make(url.Values)
-		vals.Add(versionParam, v)
-		bPath = strings.Split(bPath, "?")[0] // remove versionID from path
-	}
-
-	// handling for bucket names containing periods / explicit PathStyle addressing
+	u.Scheme = c.Scheme
+	// handling for bucket names containing periods
 	// http://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html for details
 	if strings.Contains(b.Name, ".") || c.PathStyle {
-		return &url.URL{
-			Host:     b.S3.Domain,
-			Scheme:   c.Scheme,
-			Path:     path.Clean(fmt.Sprintf("/%s/%s", b.Name, bPath)),
-			RawQuery: vals.Encode(),
-		}, nil
+		u.Host = b.S3.Domain
+		u.Path = path.Clean(fmt.Sprintf("/%s/%s", b.Name, u.Path))
 	} else {
-		return &url.URL{
-			Scheme:   c.Scheme,
-			Path:     path.Clean(fmt.Sprintf("/%s", bPath)),
-			Host:     path.Clean(fmt.Sprintf("%s.%s", b.Name, b.S3.Domain)),
-			RawQuery: vals.Encode(),
-		}, nil
+		u.Host = fmt.Sprintf("%s.%s", b.Name, b.S3.Domain)
+		u.Path = path.Clean(fmt.Sprintf("/%s", u.Path))
 	}
+	return u, nil
 }
 
 func (b *Bucket) conf() *Config {
@@ -195,10 +171,8 @@ func (b *Bucket) Delete(path string) error {
 		return err
 	}
 	// try to delete md5 file
-	if b.Md5Check {
-		if err := b.delete(fmt.Sprintf("/.md5/%s.md5", path)); err != nil {
-			return err
-		}
+	if err := b.delete(fmt.Sprintf("/.md5/%s.md5", path)); err != nil {
+		return err
 	}
 
 	logger.Printf("%s deleted from %s\n", path, b.Name)
