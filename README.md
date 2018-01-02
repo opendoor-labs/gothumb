@@ -1,5 +1,7 @@
 # GoThumb
 
+[![Build Status](https://travis-ci.org/opendoor-labs/gothumb.svg?branch=master)](https://travis-ci.org/opendoor-labs/gothumb)
+
 A very fast [golang](http://golang.org/) port of [thumbor](https://github.com/thumbor/thumbor).
 
 ## Features
