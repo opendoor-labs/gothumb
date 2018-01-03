@@ -55,12 +55,11 @@ jobs:
         - docker build -t gothumb-local --file=Dockerfile . --cache-from opendoor/gothumb:master-latest
         - docker history gothumb-local
       script:
-        - echo "$TRAVIS_COMMIT" > GIT_DEPLOY_SHA
         - docker build -t "opendoor/gothumb:${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from gothumb-local
         - docker push "opendoor/gothumb:${TRAVIS_COMMIT:0:7}"
         - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ "$TRAVIS_BRANCH" == "master" ]; then
-            docker build -t "opendoor/gothumb:master-${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from gothumb-local;
-            docker push "opendoor/gothumb:master-${TRAVIS_COMMIT:0:7}";
+            docker build -t "opendoor/gothumb:${TRAVIS_COMMIT:0:7}" --file=Dockerfile . --cache-from gothumb-local;
+            docker push "opendoor/gothumb:${TRAVIS_COMMIT:0:7}";
             docker build -t "opendoor/gothumb:master-latest" --file=Dockerfile . --cache-from gothumb-local;
-            docker push "opendoor/$IMAGE_REPO_NAME:master-latest";
+            docker push "opendoor/gothumb:master-latest";
           fi
