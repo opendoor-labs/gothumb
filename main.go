@@ -210,7 +210,7 @@ func generateThumbnail(w http.ResponseWriter, rmethod, rpath string, sourceURL s
 
 	if err != nil {
 		responseCode := 500
-		if err.Error() == "Unsupported image format" {
+		if err.Error() == "Unsupported image format" || strings.Contains(err.Error(), "VIPS cannot save to") {
 			responseCode = 415 // Unsupported Media Type
 		}
 		http.Error(w, fmt.Sprintf("resizing image: %s", err.Error()), responseCode)
