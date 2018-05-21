@@ -15,7 +15,12 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
+
+	d "github.com/tj/go-debug"
 )
+
+// debug is internally used to
+var debug = d.Debug("bimg")
 
 // VipsVersion exposes the current libvips semantic version
 const VipsVersion = string(C.VIPS_VERSION)
@@ -51,7 +56,6 @@ type vipsSaveOptions struct {
 	Interlace      bool
 	NoProfile      bool
 	StripMetadata  bool
-	Lossless       bool
 	OutputICC      string // Absolute path to the output ICC profile
 	Interpretation Interpretation
 }
@@ -382,6 +386,7 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 	}
 
 	if o.OutputICC != "" && vipsHasProfile(image) {
+		debug("Embedded ICC profile found, trying to convert to %s", o.OutputICC)
 		outputIccPath := C.CString(o.OutputICC)
 		defer C.free(unsafe.Pointer(outputIccPath))
 
@@ -389,7 +394,6 @@ func vipsPreSave(image *C.VipsImage, o *vipsSaveOptions) (*C.VipsImage, error) {
 		if int(err) != 0 {
 			return nil, catchVipsError()
 		}
-		C.g_object_unref(C.gpointer(image))
 		image = outImage
 	}
 
@@ -418,7 +422,6 @@ func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
 	interlace := C.int(boolToInt(o.Interlace))
 	quality := C.int(o.Quality)
 	strip := C.int(boolToInt(o.StripMetadata))
-	lossless := C.int(boolToInt(o.Lossless))
 
 	if o.Type != 0 && !IsTypeSupportedSave(o.Type) {
 		return nil, fmt.Errorf("VIPS cannot save to %#v", ImageTypes[o.Type])
@@ -426,7 +429,7 @@ func vipsSave(image *C.VipsImage, o vipsSaveOptions) ([]byte, error) {
 	var ptr unsafe.Pointer
 	switch o.Type {
 	case WEBP:
-		saveErr = C.vips_webpsave_bridge(tmpImage, &ptr, &length, strip, quality, lossless)
+		saveErr = C.vips_webpsave_bridge(tmpImage, &ptr, &length, strip, quality)
 	case PNG:
 		saveErr = C.vips_pngsave_bridge(tmpImage, &ptr, &length, strip, C.int(o.Compression), quality, interlace)
 	case TIFF:
@@ -500,7 +503,7 @@ func vipsSmartCrop(image *C.VipsImage, width, height int) (*C.VipsImage, error) 
 	return buf, nil
 }
 
-func vipsTrim(image *C.VipsImage, background Color, threshold float64) (int, int, int, int, error) {
+func vipsTrim(image *C.VipsImage) (int, int, int, int, error) {
 	defer C.g_object_unref(C.gpointer(image))
 
 	top := C.int(0)
@@ -508,10 +511,7 @@ func vipsTrim(image *C.VipsImage, background Color, threshold float64) (int, int
 	width := C.int(0)
 	height := C.int(0)
 
-	err := C.vips_find_trim_bridge(image,
-		&top, &left, &width, &height,
-		C.double(background.R), C.double(background.G), C.double(background.B),
-		C.double(threshold))
+	err := C.vips_find_trim_bridge(image, &top, &left, &width, &height)
 	if err != 0 {
 		return 0, 0, 0, 0, catchVipsError()
 	}
@@ -525,19 +525,6 @@ func vipsShrinkJpeg(buf []byte, input *C.VipsImage, shrink int) (*C.VipsImage, e
 	defer C.g_object_unref(C.gpointer(input))
 
 	err := C.vips_jpegload_buffer_shrink(ptr, C.size_t(len(buf)), &image, C.int(shrink))
-	if err != 0 {
-		return nil, catchVipsError()
-	}
-
-	return image, nil
-}
-
-func vipsShrinkWebp(buf []byte, input *C.VipsImage, shrink int) (*C.VipsImage, error) {
-	var image *C.VipsImage
-	var ptr = unsafe.Pointer(&buf[0])
-	defer C.g_object_unref(C.gpointer(input))
-
-	err := C.vips_webpload_buffer_shrink(ptr, C.size_t(len(buf)), &image, C.int(shrink))
 	if err != 0 {
 		return nil, catchVipsError()
 	}

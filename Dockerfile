@@ -56,11 +56,12 @@ WORKDIR $GOPATH
 # Copy the local package to the container's workspace.
 ADD . $GOPATH/src/github.com/opendoor-labs/gothumb
 
-RUN go get -u github.com/golang/dep/cmd/dep
+# Download the godep tool.
+RUN go get -u github.com/tools/godep
 
 # Build the gothumb command inside the container.
 WORKDIR $GOPATH/src/github.com/opendoor-labs/gothumb
-RUN go install
+RUN godep go install
 
 # Run the outyet command by default when the container starts.
 ENTRYPOINT ["/go/bin/gothumb"]
