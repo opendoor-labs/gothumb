@@ -16,6 +16,8 @@ bimg was heavily inspired in [sharp](https://github.com/lovell/sharp), its homol
 **v1 notice**: `bimg` introduces some minor breaking changes in `v1` release.
 If you're using `gopkg.in`, you can still rely in the `v0` without worrying about API breaking changes.
 
+`bimg` is currently maintained by [Kirill Danshin](https://github.com/kirillDanshin).
+
 ## Contents
 
 - [Supported image operations](#supported-image-operations)
